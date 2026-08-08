@@ -8,6 +8,8 @@ import models
 models.init_db()
 
 import app as appmod
+appmod.resolve_password()
+PASSWORD = appmod.PASSWORD
 client = appmod.app.test_client()
 
 failures = []
@@ -17,14 +19,22 @@ def check(name, resp, want=200):
     if not ok:
         failures.append((name, resp.status_code))
 
-# --- Auth-off reads ---
-check("GET /", client.get("/"))
+def login():
+    return client.post("/login", data={"password": PASSWORD})
+
+# --- Auth: app is locked by default ---
+check("GET / redirects to login when unauth", client.get("/"), 302)
+check("GET /login is reachable", client.get("/login"))
+check("GET /health open", client.get("/health"))
+login()  # all further requests are authenticated
+
+# --- Authenticated reads ---
+check("GET / (authed)", client.get("/"))
 check("GET /customers", client.get("/customers"))
 check("GET /jobs", client.get("/jobs"))
 check("GET /customers/new", client.get("/customers/new"))
 check("GET /jobs/new", client.get("/jobs/new"))
 check("GET /api/stats", client.get("/api/stats"))
-check("GET /health", client.get("/health"))
 
 # --- Create customer ---
 r = client.post("/customers/new", data={

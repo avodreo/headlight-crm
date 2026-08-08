@@ -1,8 +1,10 @@
 """
 Headlight Restoration CRM — Flask application.
-Server-rendered, mobile-responsive. Optional single-password auth.
+Server-rendered, mobile-responsive. Single-password auth (never open in prod).
 """
 import os
+import secrets
+import time
 from datetime import datetime, date
 
 from flask import (
@@ -12,19 +14,61 @@ from flask import (
 import models
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-change-me-in-production")
+app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+# Harden session cookies (safe for both http dev and https prod via proxy).
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("SECURE_COOKIES", "1") == "1",
+)
 
-PASSWORD = os.environ.get("CRM_PASSWORD", "")  # empty = open access
+PASSWORD = None  # resolved at startup in resolve_password()
+
+
+def resolve_password():
+    """Determine the app password.
+
+    - If CRM_PASSWORD is set, use it (explicit choice wins).
+    - Otherwise NEVER leave the app world-open: generate a strong password,
+      persist it in the DB so it survives restarts (when the disk is attached),
+      and print it to the startup logs.
+    """
+    global PASSWORD
+    explicit = os.environ.get("CRM_PASSWORD", "").strip()
+    if explicit:
+        PASSWORD = explicit
+        return
+    stored = models.get_setting("admin_password")
+    if stored:
+        PASSWORD = stored
+        return
+    generated = secrets.token_urlsafe(12)
+    try:
+        models.set_setting("admin_password", generated)
+    except Exception:
+        pass  # if DB not writable yet, we'll just print it below
+    PASSWORD = generated
+    print("\n" + "=" * 60)
+    print("  AUTO-GENERATED CRM PASSWORD (save this!):")
+    print(f"     {generated}")
+    print("  Set CRM_PASSWORD env var to choose your own and avoid regen.")
+    print("=" * 60 + "\n")
 
 
 # ----------------------------- Auth -----------------------------
 
+# Brute-force protection: 5 failed attempts per IP, 1-minute lockout.
+_LOGIN_ATTEMPTS = {}
+_MAX_ATTEMPTS = 5
+_LOCKOUT_SECONDS = 60
+
+
 @app.before_request
 def require_auth():
-    if not PASSWORD:
+    # Health & static always open (health probes must work without auth).
+    if request.endpoint in ("health", "static"):
         return
-    # Allow the login route and static assets always.
-    if request.endpoint in ("login", "static"):
+    if request.endpoint == "login":
         return
     if not session.get("authed"):
         return redirect(url_for("login"))
@@ -32,13 +76,25 @@ def require_auth():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if not PASSWORD:
-        return redirect(url_for("dashboard"))
     if request.method == "POST":
-        if request.form.get("password", "") == PASSWORD:
+        ip = request.remote_addr or "unknown"
+        now = time.time()
+        attempts, lock_until = _LOGIN_ATTEMPTS.get(ip, (0, 0))
+        if now < lock_until:
+            flash("Too many attempts. Try again in a minute.", "error")
+            return render_template("login.html")
+        if secrets.compare_digest(request.form.get("password", ""), PASSWORD or ""):
+            _LOGIN_ATTEMPTS[ip] = (0, 0)
             session["authed"] = True
+            session.permanent = True
             return redirect(url_for("dashboard"))
-        flash("Incorrect password.", "error")
+        attempts += 1
+        if attempts >= _MAX_ATTEMPTS:
+            _LOGIN_ATTEMPTS[ip] = (attempts, now + _LOCKOUT_SECONDS)
+            flash("Too many attempts. Try again in a minute.", "error")
+        else:
+            _LOGIN_ATTEMPTS[ip] = (attempts, 0)
+            flash("Incorrect password.", "error")
     return render_template("login.html")
 
 
@@ -233,7 +289,7 @@ def delete_payment(jid, pid):
 
 @app.route("/api/stats")
 def api_stats():
-    if PASSWORD and not session.get("authed"):
+    if not session.get("authed"):
         return jsonify({"error": "unauthorized"}), 401
     return jsonify(models.dashboard_stats())
 
@@ -247,5 +303,15 @@ def health():
 
 if __name__ == "__main__":
     models.init_db()
+    resolve_password()
+    # Loud warning: on Render (and most PaaS), the filesystem is ephemeral.
+    # Without a persistent disk + CRM_DB_PATH, the database is wiped on restart.
+    on_paas = bool(os.environ.get("RENDER")) or os.environ.get("PORT") and os.path.exists("/.dockerenv")
+    if on_paas and not os.environ.get("CRM_DB_PATH"):
+        print("\n" + "!" * 60)
+        print("  WARNING: no CRM_DB_PATH set on a PaaS host.")
+        print("  Your data will be LOST on every restart/deploy.")
+        print("  Attach a persistent disk and set CRM_DB_PATH=/var/data/crm.db")
+        print("!" * 60 + "\n")
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)

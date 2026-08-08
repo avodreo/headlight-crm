@@ -65,6 +65,32 @@ def init_db():
         )
         """
     )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS meta (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_setting(key, default=None):
+    conn = get_conn()
+    row = conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+    conn.close()
+    return row["value"] if row else default
+
+
+def set_setting(key, value):
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO meta(key, value) VALUES(?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        (key, str(value)),
+    )
     conn.commit()
     conn.close()
 

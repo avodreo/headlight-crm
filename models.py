@@ -87,6 +87,14 @@ CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT
 );
+CREATE TABLE IF NOT EXISTS job_photos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL DEFAULT 'after',
+    data BLOB NOT NULL,
+    mime TEXT NOT NULL DEFAULT 'image/jpeg',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 _PG_DDL = """
@@ -119,6 +127,14 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT
+);
+CREATE TABLE IF NOT EXISTS job_photos (
+    id SERIAL PRIMARY KEY,
+    job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL DEFAULT 'after',
+    data BYTEA NOT NULL,
+    mime TEXT NOT NULL DEFAULT 'image/jpeg',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 """
 
@@ -310,6 +326,62 @@ def payments_for_job(jid):
     rows = _rows(cur)
     conn.close()
     return rows
+
+
+# ----------------------------- Photos ------------------------------
+
+_ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp"}
+_MAX_PHOTO_BYTES = 8 * 1024 * 1024  # 8 MB cap
+
+
+def photo_upload(job_id, kind, data, mime):
+    """Store a job photo as a BLOB. Returns the new row id."""
+    if mime not in _ALLOWED_MIME:
+        raise ValueError("Unsupported image type")
+    if len(data) > _MAX_PHOTO_BYTES:
+        raise ValueError("Image too large (max 8 MB)")
+    kind = kind if kind in ("before", "after") else "after"
+    conn = get_conn()
+    cur = conn.execute(
+        _sql("INSERT INTO job_photos (job_id, kind, data, mime) "
+             "VALUES (%s,%s,%s,%s) RETURNING id"),
+        (job_id, kind, data, mime),
+    )
+    pid = cur.fetchone()[0]
+    conn.commit()
+    conn.close()
+    return pid
+
+
+def photos_for_job(jid):
+    conn = get_conn()
+    cur = conn.execute(
+        _sql("SELECT id, job_id, kind, mime, "
+             "COALESCE(LENGTH(data),0) AS size, created_at "
+             "FROM job_photos WHERE job_id=%s ORDER BY kind, id"),
+        (jid,),
+    )
+    rows = _rows(cur)
+    conn.close()
+    return rows
+
+
+def photo_get(pid):
+    conn = get_conn()
+    cur = conn.execute(
+        _sql("SELECT id, job_id, kind, data, mime FROM job_photos WHERE id=%s"),
+        (pid,),
+    )
+    row = _one(cur)
+    conn.close()
+    return row
+
+
+def photo_delete(pid):
+    conn = get_conn()
+    conn.execute(_sql("DELETE FROM job_photos WHERE id=%s"), (pid,))
+    conn.commit()
+    conn.close()
 
 
 # ---------------------------- Dashboard -----------------------------

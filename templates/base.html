@@ -76,6 +76,15 @@
       border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;
       transition:opacity .2s;pointer-events:none;z-index:30}
     .toast.show{opacity:1}
+    .photos-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}
+    .photo-col{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
+    .photo-label{font-weight:800;font-size:14px;margin-bottom:8px;color:var(--brand)}
+    .photo-thumb{margin-bottom:10px}
+    .photo-thumb img{width:100%;border-radius:10px;display:block;border:1px solid var(--line);background:#000}
+    .photo-thumb form{margin-top:6px}
+    .upload-row{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+    .upload-row input[type=file]{padding:8px}
+    .empty.small{color:var(--muted);font-size:13px;padding:10px 4px;text-align:center}
     @media(min-width:760px){.nav{justify-content:flex-start}}
   </style>
 </head>

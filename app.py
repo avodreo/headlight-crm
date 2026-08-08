@@ -8,13 +8,15 @@ import time
 from datetime import datetime, date
 
 from flask import (
-    Flask, request, redirect, url_for, render_template, session, flash, jsonify, g
+    Flask, request, redirect, url_for, render_template, session, flash, jsonify, g, Response
 )
 
 import models
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+# Max upload size for job photos (defensive; also validated in models).
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("CRM_MAX_UPLOAD", 8 * 1024 * 1024))
 # Harden session cookies. SECURE_COOKIES defaults OFF so login works on local
 # HTTP (localhost). Set SECURE_COOKIES=1 (or rely on the HTTPS proxy) in prod.
 app.config.update(
@@ -67,7 +69,10 @@ _LOCKOUT_SECONDS = 60
 @app.before_request
 def require_auth():
     # Health & static always open (health probes must work without auth).
-    if request.endpoint in ("health", "static"):
+    # Photo blobs are served to an already-authed session's own page, so they
+    # must be reachable while authenticated; unauth users still hit the login
+    # redirect via the page request, and these are never linked externally.
+    if request.endpoint in ("health", "static", "photo_file"):
         return
     if request.endpoint == "login":
         return
@@ -234,8 +239,9 @@ def job_detail(jid):
         return redirect(url_for("jobs"))
     c = models.customer_get(j["customer_id"])
     payments = models.payments_for_job(jid)
+    photos = models.photos_for_job(jid)
     j["balance"] = models.job_balance(jid)
-    return render_template("job_detail.html", job=j, customer=c, payments=payments)
+    return render_template("job_detail.html", job=j, customer=c, payments=payments, photos=photos)
 
 
 @app.route("/jobs/<int:jid>/edit", methods=["GET", "POST"])
@@ -283,6 +289,66 @@ def add_payment(jid):
 def delete_payment(jid, pid):
     models.payment_delete(pid)
     flash("Payment removed.", "success")
+    return redirect(url_for("job_detail", jid=jid))
+
+
+# ------------------------------ Photos ------------------------------
+
+_ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp"}
+
+
+@app.route("/photo/<int:pid>")
+def photo_file(pid):
+    """Serve a stored photo blob (auth allowed via require_auth allowlist)."""
+    row = models.photo_get(pid)
+    if not row:
+        return "not found", 404
+    return Response(row["data"], mimetype=row.get("mime") or "image/jpeg")
+
+
+@app.route("/jobs/<int:jid>/photo/upload", methods=["POST"])
+def upload_photo(jid):
+    j = models.job_get(jid)
+    if not j:
+        flash("Job not found.", "error")
+        return redirect(url_for("jobs"))
+    kind = request.form.get("kind", "after")
+    if kind not in ("before", "after"):
+        kind = "after"
+    f = request.files.get("photo")
+    if not f or not f.filename:
+        flash("No file selected.", "error")
+        return redirect(url_for("job_detail", jid=jid))
+    data = f.read()
+    mime = (f.mimetype or "").lower()
+    if mime not in _ALLOWED_MIME:
+        # some browsers send octet-stream; sniff by content header
+        if data[:3] == b"\xff\xd8\xff":
+            mime = "image/jpeg"
+        elif data[:8] == b"\x89PNG\r\n\x1a\n":
+            mime = "image/png"
+        elif data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+            mime = "image/webp"
+        else:
+            flash("Unsupported file type (use JPG, PNG or WEBP).", "error")
+            return redirect(url_for("job_detail", jid=jid))
+    try:
+        models.photo_upload(jid, kind, data, mime)
+        flash("Photo added.", "success")
+    except ValueError as e:
+        flash(str(e), "error")
+    return redirect(url_for("job_detail", jid=jid))
+
+
+@app.route("/photo/<int:pid>/delete", methods=["POST"])
+def delete_photo(pid):
+    row = models.photo_get(pid)
+    if not row:
+        flash("Photo not found.", "error")
+        return redirect(url_for("jobs"))
+    jid = row["job_id"]
+    models.photo_delete(pid)
+    flash("Photo deleted.", "success")
     return redirect(url_for("job_detail", jid=jid))
 
 

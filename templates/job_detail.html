@@ -24,6 +24,34 @@
     </form>
   </div>
 
+  <h2>📸 Before / After Photos</h2>
+  {% set before_photos = photos|selectattr('kind','equalto','before')|list %}
+  {% set after_photos = photos|selectattr('kind','equalto','after')|list %}
+  <div class="photos-grid">
+    {% for label, plist in [('Before', before_photos), ('After', after_photos)] %}
+      <div class="photo-col">
+        <div class="photo-label">{{label}}</div>
+        {% if plist %}
+          {% for p in plist %}
+            <div class="photo-thumb">
+              <img src="{{url_for('photo_file', pid=p.id)}}" alt="{{label}} photo" loading="lazy">
+              <form method="post" action="{{url_for('delete_photo', pid=p.id)}}" onsubmit="return confirm('Delete this photo?');">
+                <button class="btn ghost sm" type="submit">✕ Remove</button>
+              </form>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty small">No {{label.lower()}} photo yet.</div>
+        {% endif %}
+        <form method="post" action="{{url_for('upload_photo', jid=job.id)}}" enctype="multipart/form-data" class="upload-row">
+          <input type="hidden" name="kind" value="{{label.lower()}}">
+          <input type="file" name="photo" accept="image/*" capture="environment" required>
+          <button class="btn sm" type="submit">＋ Add {{label}}</button>
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+
   <h2>💵 Payments</h2>
   {% if payments %}
     <ul class="list">

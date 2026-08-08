@@ -9,6 +9,9 @@ Mobile-friendly and designed to run on a phone in the field.
 - **Customers** — name, phone, email, vehicle, address, notes; one tap to call/email.
 - **Jobs** — service type, date, status (Scheduled / In Progress / Completed / Cancelled), price, cost.
 - **Payments** — record cash / card / Venmo / Zelle / check; auto-calculates balance due.
+- **Before / After photos** — attach a before and after shot to each job (stored in
+  the DB, so they survive restarts). On a phone, the camera opens directly from the
+  upload button (`capture="environment"`).
 - **Offline-friendly data** — a single SQLite file in `data/crm.db` (no external database server).
 - **Optional password** — set `CRM_PASSWORD` to gate the whole app.
 
@@ -52,6 +55,24 @@ python -c "import models, models as m; m.init_db(); m.seed_demo()"
      DB (so it survives restarts). Set `CRM_PASSWORD` to control it yourself.
 5. Open the generated `https://<your-service>.onrender.com` on your phone.
 
+> **First-time setup recap:** set `CRM_PASSWORD` (your login) and `DATABASE_URL`
+> (Postgres internal URL). That's it — the app comes up locked and with data that
+> survives restarts.
+
+### Running it on your phone
+
+**Option A — on your own network (free, no deploy):**
+1. On your laptop, start the app: `python run.py` (it listens on `0.0.0.0`).
+2. Find your laptop's LAN IP: `ipconfig` → look for `IPv4 Address` on your
+   Wi-Fi adapter (e.g. `192.168.1.94`).
+3. On your phone (same Wi-Fi), open `http://<that-ip>:5000` and log in.
+4. Use the **Before / After Photos** section on a job — tap **＋ Add Before** and
+   your phone camera opens so you can snap the headlight right there.
+
+**Option B — anywhere via Render (deployed, works on mobile data):**
+1. Deploy as described above (Postgres + `CRM_PASSWORD` set).
+2. On your phone, open the `https://<your-service>.onrender.com` URL and bookmark it.
+
 > **Alternative (no DB service):** keep SQLite by attaching a 1 GB persistent
 > disk at `/var/data` and setting `CRM_DB_PATH=/var/data/crm.db`. Postgres is
 > preferred because it's managed and needs no disk.
@@ -72,6 +93,7 @@ python -c "import models, models as m; m.init_db(); m.seed_demo()"
 | `CRM_DB_PATH` | SQLite file location (only used when `DATABASE_URL` is unset) | `data/crm.db` |
 | `PORT` | Listen port (hosts set this) | 5000 |
 | `SECURE_COOKIES` | Set `0` only if serving over plain HTTP behind no TLS | `1` |
+| `CRM_MAX_UPLOAD` | Max photo upload size in bytes (also enforced in code) | `8388608` (8 MB) |
 
 ## Project layout
 ```

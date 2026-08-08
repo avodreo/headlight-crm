@@ -75,6 +75,31 @@ assert models.job_balance(jid) == 59.0, models.job_balance(jid)
 check("GET /customers/{cid}", client.get(f"/customers/{cid}"))
 check("GET /jobs/{jid}", client.get(f"/jobs/{jid}"))
 
+# --- Photos: upload before/after, serve, delete ---
+import base64, io
+_png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC")
+r = client.post(f"/jobs/{jid}/photo/upload", data={
+    "kind": "before",
+    "photo": (io.BytesIO(_png), "before.png", "image/png"),
+})
+check("POST upload before-photo", r, 302)
+r = client.post(f"/jobs/{jid}/photo/upload", data={
+    "kind": "after",
+    "photo": (io.BytesIO(_png), "after.png", "image/png"),
+})
+check("POST upload after-photo", r, 302)
+ph = models.photos_for_job(jid)
+assert len(ph) == 2, ph
+assert {p["kind"] for p in ph} == {"before", "after"}
+pid = ph[0]["id"]
+r = client.get(f"/photo/{pid}")
+check("GET /photo/<pid> serves image", r, 200)
+assert r.content_type.startswith("image/"), r.content_type
+assert r.data == _png
+r = client.post(f"/photo/{pid}/delete")
+check("POST delete photo", r, 302)
+assert len(models.photos_for_job(jid)) == 1
+
 # --- Delete payment ---
 pid = models.payments_for_job(jid)[-1]["id"]
 r = client.post(f"/jobs/{jid}/payment/{pid}/delete")

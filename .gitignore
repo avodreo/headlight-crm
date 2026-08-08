@@ -4,6 +4,8 @@ data/
 *.db
 *.db-wal
 *.db-shm
+uploads/
+nul
 .env
 .venv/
 venv/

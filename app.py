@@ -363,7 +363,12 @@ def api_stats():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    return jsonify({
+        "status": "ok",
+        "has_crm_pw": bool(os.environ.get("CRM_PASSWORD")),
+        "db_backend": "postgres" if models.USE_PG else "sqlite",
+        "render": bool(os.environ.get("RENDER")),
+    })
 
 
 # -----------------------------------------------------------------

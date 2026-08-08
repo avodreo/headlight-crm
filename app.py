@@ -15,11 +15,12 @@ import models
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
-# Harden session cookies (safe for both http dev and https prod via proxy).
+# Harden session cookies. SECURE_COOKIES defaults OFF so login works on local
+# HTTP (localhost). Set SECURE_COOKIES=1 (or rely on the HTTPS proxy) in prod.
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=os.environ.get("SECURE_COOKIES", "1") == "1",
+    SESSION_COOKIE_SECURE=os.environ.get("SECURE_COOKIES", "0") == "1",
 )
 
 PASSWORD = None  # resolved at startup in resolve_password()

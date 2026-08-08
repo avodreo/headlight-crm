@@ -17,9 +17,15 @@ Mobile-friendly and designed to run on a phone in the field.
 ```bash
 cd headlight-crm
 pip install -r requirements.txt
-python app.py
+python run.py
 # open http://localhost:5000
 ```
+
+> **Use `run.py`, not `python app.py`.** On some setups Flask's built-in
+> dev server (`app.run()`) skips `before_request` hooks, leaving the app
+> unauthenticated. `run.py` serves via **waitress** — the same server used in
+> production — so auth works correctly. The first launch prints an
+> auto-generated password (or set `CRM_PASSWORD`).
 
 To load demo data once:
 ```python

@@ -363,21 +363,19 @@ def api_stats():
 
 @app.route("/health")
 def health():
-    return jsonify({
-        "status": "ok",
-        "has_crm_pw": bool(os.environ.get("CRM_PASSWORD")),
-        "crm_pw_len": len(os.environ.get("CRM_PASSWORD", "")),
-        "db_backend": "postgres" if models.USE_PG else "sqlite",
-        "render": bool(os.environ.get("RENDER")),
-    })
+    return jsonify({"status": "ok"})
 
 
 # -----------------------------------------------------------------
+# Initialise the database and resolve the admin password at import time.
+# On Render the start command is `waitress-serve ... app:app`, so __main__
+# is waitress (not this module) — these MUST run on import or auth/DB break.
+
+models.init_db()
+resolve_password()
 
 if __name__ == "__main__":
-    models.init_db()
-    resolve_password()
-    # Data persistence guidance.
+    # Local dev path (python run.py / python app.py). Guidance only.
     if models.USE_PG:
         print("\n  Using Postgres (DATABASE_URL). Data is managed & survives restarts.\n")
     elif not os.environ.get("CRM_DB_PATH"):

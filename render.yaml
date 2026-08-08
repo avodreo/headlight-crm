@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: headlight-crm
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    # WAL + relative data/ path: a persistent disk keeps the SQLite DB alive
+    startCommand: "gunicorn -w 2 -b 0.0.0.0:$PORT app:app"
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CRM_PASSWORD
+        sync: false      # set a password in the Render dashboard (leave blank for open)
+      - key: CRM_DB_PATH
+        sync: false      # e.g. /var/data/crm.db  (must live on a persistent disk)

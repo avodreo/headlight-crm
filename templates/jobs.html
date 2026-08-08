@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Jobs · Headlight CRM{% endblock %}
+{% block content %}
+  <h1>Jobs</h1>
+  {% if jobs %}
+    <table>
+      <thead><tr><th>Customer</th><th>Date</th><th>Service</th><th>Price</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for j in jobs %}
+          <tr onclick="location.href='{{url_for('job_detail',jid=j.id)}}'" style="cursor:pointer">
+            <td>{{j.customer_name}}</td>
+            <td>{{j.job_date or '—'}}</td>
+            <td>{{j.service_type or 'Service'}}</td>
+            <td>{{j.price|money}}</td>
+            <td>{% if j.status=='Completed' %}<span class="badge b-done">Done</span>
+              {% elif j.status=='Scheduled' %}<span class="badge b-sched">Sched</span>
+              {% elif j.status=='In Progress' %}<span class="badge b-prog">Active</span>
+              {% else %}<span class="badge b-cancel">Cancel</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="empty">No jobs yet.</div>
+  {% endif %}
+  <a class="fab" href="{{url_for('job_new')}}" title="New job">+</a>
+{% endblock %}

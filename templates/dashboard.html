@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Headlight CRM{% endblock %}
+{% block content %}
+  <h1>Dashboard</h1>
+  <div class="grid">
+    <div class="stat"><div class="k">Customers</div><div class="v">{{stats.customers}}</div></div>
+    <div class="stat"><div class="k">Jobs</div><div class="v">{{stats.jobs}}</div></div>
+    <div class="stat"><div class="k">Collected</div><div class="v green">{{stats.revenue|money}}</div></div>
+    <div class="stat"><div class="k">Outstanding</div><div class="v red">{{stats.outstanding|money}}</div></div>
+    <div class="stat"><div class="k">Profit</div><div class="v brand">{{stats.profit|money}}</div></div>
+    <div class="stat"><div class="k">Completed</div><div class="v">{{stats.completed_jobs}}</div></div>
+  </div>
+
+  <h2>⏰ Upcoming Jobs</h2>
+  {% if stats.upcoming %}
+    <ul class="list">
+      {% for j in stats.upcoming %}
+        <a class="li" href="{{url_for('job_detail',jid=j.id)}}">
+          <div class="t">{{j.customer_name}} — {{j.service_type or 'Headlight Restoration'}}</div>
+          <div class="s">{{j.job_date or 'No date'}} · <span class="badge b-sched">{{j.status}}</span></div>
+        </a>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">No upcoming jobs. Book one! 🚗</div>
+  {% endif %}
+
+  <h2>🕑 Recent Jobs</h2>
+  {% if stats.recent %}
+    <ul class="list">
+      {% for j in stats.recent %}
+        <a class="li" href="{{url_for('job_detail',jid=j.id)}}">
+          <div class="t">{{j.customer_name}}</div>
+          <div class="s">{{j.job_date or '—'}} · {{j.service_type or 'Service'}} · {{j.price|money}}
+            {% if j.status=='Completed' %}<span class="badge b-done">Done</span>
+            {% elif j.status=='Scheduled' %}<span class="badge b-sched">Sched</span>
+            {% else %}<span class="badge b-prog">{{j.status}}</span>{% endif %}</div>
+        </a>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">No jobs yet.</div>
+  {% endif %}
+
+  <a class="fab" href="{{url_for('job_new')}}" title="New job">+</a>
+{% endblock %}

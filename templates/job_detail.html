@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Job #{{job.id}} · Headlight CRM{% endblock %}
+{% block content %}
+  <h1>Job #{{job.id}}</h1>
+  <div class="card">
+    <div class="kv"><span class="k">Customer</span><span><a href="{{url_for('customer_detail',cid=job.customer_id)}}">{{customer.name}}</a></span></div>
+    <div class="kv"><span class="k">Phone</span><span>{% if customer.phone %}<a href="tel:{{customer.phone}}">{{customer.phone}}</a>{% else %}—{% endif %}</span></div>
+    <div class="kv"><span class="k">Date</span><span>{{job.job_date or '—'}}</span></div>
+    <div class="kv"><span class="k">Service</span><span>{{job.service_type or '—'}}</span></div>
+    <div class="kv"><span class="k">Status</span><span>
+      {% if job.status=='Completed' %}<span class="badge b-done">Completed</span>
+      {% elif job.status=='Scheduled' %}<span class="badge b-sched">Scheduled</span>
+      {% elif job.status=='In Progress' %}<span class="badge b-prog">In Progress</span>
+      {% else %}<span class="badge b-cancel">Cancelled</span>{% endif %}</span></div>
+    <div class="kv"><span class="k">Price</span><span>{{job.price|money}}</span></div>
+    <div class="kv"><span class="k">Cost</span><span>{{job.cost|money}}</span></div>
+    <div class="kv"><span class="k">Balance due</span><span style="color:var(--brand);font-weight:700">{{job.balance|money}}</span></div>
+    {% if job.notes %}<div class="kv"><span class="k">Notes</span><span>{{job.notes}}</span></div>{% endif %}
+  </div>
+  <div class="row">
+    <a class="btn ghost sm" href="{{url_for('job_edit',jid=job.id)}}">Edit</a>
+    <form method="post" action="{{url_for('job_delete',jid=job.id)}}" onsubmit="return confirm('Delete this job?');" style="flex:0">
+      <button class="btn red sm" type="submit">Delete</button>
+    </form>
+  </div>
+
+  <h2>💵 Payments</h2>
+  {% if payments %}
+    <ul class="list">
+      {% for p in payments %}
+        <div class="li" style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1">
+            <div class="t">{{p.amount|money}} <span class="muted">· {{p.method or '—'}}</span></div>
+            <div class="s">{{p.pay_date or '—'}}{% if p.note %} · {{p.note}}{% endif %}</div>
+          </div>
+          <form method="post" action="{{url_for('delete_payment',jid=job.id,pid=p.id)}}" onsubmit="return confirm('Remove payment?');" style="flex:0">
+            <button class="btn ghost sm" type="submit">✕</button>
+          </form>
+        </div>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">No payments yet.</div>
+  {% endif %}
+
+  <h2>Record Payment</h2>
+  <form method="post" action="{{url_for('add_payment',jid=job.id)}}" class="card">
+    <div class="row">
+      <div style="flex:1.4">
+        <label>Amount ($)</label>
+        <input name="amount" type="number" step="0.01" min="0" value="{{job.balance if job.balance>0 else ''}}" placeholder="0.00" required>
+      </div>
+      <div>
+        <label>Method</label>
+        <select name="method">
+          <option value="">—</option><option>Cash</option><option>Card</option>
+          <option>Venmo</option><option>Zelle</option><option>Check</option>
+        </select>
+      </div>
+    </div>
+    <label>Date</label>
+    <input name="pay_date" type="date" value="{{today}}">
+    <label>Note</label>
+    <input name="note" placeholder="Deposit, full payment…">
+    <button class="btn full" type="submit" style="margin-top:12px">Record Payment</button>
+  </form>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Customers · Headlight CRM{% endblock %}
+{% block content %}
+  <h1>Customers</h1>
+  {% if customers %}
+    <ul class="list">
+      {% for c in customers %}
+        <a class="li" href="{{url_for('customer_detail',cid=c.id)}}">
+          <div class="t">{{c.name}}</div>
+          <div class="s">{{c.vehicle or '—'}}{% if c.phone %} · {{c.phone}}{% endif %}</div>
+        </a>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">No customers yet. Add your first!</div>
+  {% endif %}
+  <a class="fab" href="{{url_for('customer_new')}}" title="New customer">+</a>
+{% endblock %}

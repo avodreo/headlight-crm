@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Login · Headlight CRM</title>
+  <style>
+    body{margin:0;background:#0f1115;color:#e8ecf2;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+      display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+    .box{background:#171a21;border:1px solid #2a2f3a;border-radius:16px;padding:28px;width:100%;max-width:340px}
+    .logo{font-weight:800;font-size:20px;text-align:center;margin-bottom:18px}
+    .logo b{color:#f5b301}
+    label{display:block;font-size:13px;color:#9aa3b2;margin:12px 0 5px}
+    input{width:100%;background:#1f242e;border:1px solid #2a2f3a;color:#e8ecf2;border-radius:10px;padding:12px;font-size:15px}
+    input:focus{outline:none;border-color:#f5b301}
+    .btn{width:100%;background:#f5b301;color:#11131a;font-weight:800;border:none;border-radius:11px;padding:13px;font-size:15px;margin-top:18px;cursor:pointer}
+    .flash{background:#3a1318;color:#ffb3bd;padding:10px 12px;border-radius:10px;margin-bottom:12px;font-size:14px}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="logo"><b>◉</b> HeadlightCRM</div>
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat,msg in msgs %}<div class="flash">{{msg}}</div>{% endfor %}
+    {% endwith %}
+    <form method="post">
+      <label>Password</label>
+      <input name="password" type="password" autofocus required>
+      <button class="btn" type="submit">Unlock</button>
+    </form>
+  </div>
+</body>
+</html>

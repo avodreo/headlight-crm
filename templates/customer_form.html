@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{% if customer %}Edit Customer{% else %}New Customer{% endif %} · Headlight CRM{% endblock %}
+{% block content %}
+  <h1>{% if customer %}Edit Customer{% else %}New Customer{% endif %}</h1>
+  <form method="post" action="">
+    <label>Name *</label>
+    <input name="name" required value="{{customer.name if customer else ''}}" placeholder="Sarah Mitchell">
+
+    <label>Phone</label>
+    <input name="phone" value="{{customer.phone if customer else ''}}" placeholder="555-0132">
+
+    <label>Email</label>
+    <input name="email" type="email" value="{{customer.email if customer else ''}}" placeholder="sarah@example.com">
+
+    <label>Vehicle</label>
+    <input name="vehicle" value="{{customer.vehicle if customer else ''}}" placeholder="2018 Honda Civic">
+
+    <label>Address</label>
+    <input name="address" value="{{customer.address if customer else ''}}" placeholder="120 Oak St">
+
+    <label>Notes</label>
+    <textarea name="notes" placeholder="Referral source, preferences…">{{customer.notes if customer else ''}}</textarea>
+
+    <div class="row" style="margin-top:18px">
+      <a class="btn ghost" href="{% if customer %}{{url_for('customer_detail',cid=customer.id)}}{% else %}{{url_for('customers')}}{% endif %}">Cancel</a>
+      <button class="btn" type="submit">Save</button>
+    </div>
+  </form>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{% if job %}Edit Job{% else %}New Job{% endif %} · Headlight CRM{% endblock %}
+{% block content %}
+  <h1>{% if job %}Edit Job{% else %}New Job{% endif %}</h1>
+  <form method="post" action="">
+    <label>Customer *</label>
+    <select name="customer_id" required>
+      {% if not job %}<option value="">Select customer…</option>{% endif %}
+      {% for c in customers %}
+        <option value="{{c.id}}" {% if (job and job.customer_id==c.id) or (sel_cid==c.id) %}selected{% endif %}>{{c.name}} — {{c.vehicle or 'no vehicle'}}</option>
+      {% endfor %}
+    </select>
+
+    <label>Date</label>
+    <input name="job_date" type="date" value="{{job.job_date if job else today}}">
+
+    <label>Service type</label>
+    <input name="service_type" value="{{job.service_type if job else ''}}" placeholder="Premium Restoration + Ceramic">
+
+    <label>Status</label>
+    <select name="status">
+      {% for s in ['Scheduled','In Progress','Completed','Cancelled'] %}
+        <option value="{{s}}" {% if (job and job.status==s) or (not job and s=='Scheduled') %}selected{% endif %}>{{s}}</option>
+      {% endfor %}
+    </select>
+
+    <div class="row">
+      <div>
+        <label>Price ($)</label>
+        <input name="price" type="number" step="0.01" min="0" value="{{job.price if job else ''}}" placeholder="149">
+      </div>
+      <div>
+        <label>Cost ($)</label>
+        <input name="cost" type="number" step="0.01" min="0" value="{{job.cost if job else ''}}" placeholder="18">
+      </div>
+    </div>
+
+    <label>Notes</label>
+    <textarea name="notes" placeholder="Location, special requests…">{{job.notes if job else ''}}</textarea>
+
+    <div class="row" style="margin-top:18px">
+      <a class="btn ghost" href="{% if job %}{{url_for('job_detail',jid=job.id)}}{% else %}{{url_for('jobs')}}{% endif %}">Cancel</a>
+      <button class="btn" type="submit">Save</button>
+    </div>
+  </form>
+{% endblock %}

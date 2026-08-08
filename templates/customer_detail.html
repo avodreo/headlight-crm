@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{customer.name}} · Headlight CRM{% endblock %}
+{% block content %}
+  <h1>{{customer.name}}</h1>
+  <div class="card">
+    <div class="kv"><span class="k">Phone</span><span>{% if customer.phone %}<a href="tel:{{customer.phone}}">{{customer.phone}}</a>{% else %}—{% endif %}</span></div>
+    <div class="kv"><span class="k">Email</span><span>{% if customer.email %}<a href="mailto:{{customer.email}}">{{customer.email}}</a>{% else %}—{% endif %}</span></div>
+    <div class="kv"><span class="k">Vehicle</span><span>{{customer.vehicle or '—'}}</span></div>
+    <div class="kv"><span class="k">Address</span><span>{{customer.address or '—'}}</span></div>
+    {% if customer.notes %}<div class="kv"><span class="k">Notes</span><span>{{customer.notes}}</span></div>{% endif %}
+  </div>
+  <div class="row">
+    <a class="btn ghost sm" href="{{url_for('customer_edit',cid=customer.id)}}">Edit</a>
+    <form method="post" action="{{url_for('customer_delete',cid=customer.id)}}" onsubmit="return confirm('Delete this customer and all their jobs?');" style="flex:0">
+      <button class="btn red sm" type="submit">Delete</button>
+    </form>
+  </div>
+
+  <h2>🛠 Jobs for {{customer.name.split()[0]}}</h2>
+  {% if jobs %}
+    <ul class="list">
+      {% for j in jobs %}
+        <a class="li" href="{{url_for('job_detail',jid=j.id)}}">
+          <div class="t">{{j.service_type or 'Headlight Restoration'}}</div>
+          <div class="s">{{j.job_date or '—'}} · {{j.price|money}}
+            {% if j.status=='Completed' %}<span class="badge b-done">Done</span>
+            {% elif j.status=='Scheduled' %}<span class="badge b-sched">Sched</span>
+            {% elif j.status=='In Progress' %}<span class="badge b-prog">Active</span>
+            {% else %}<span class="badge b-cancel">Cancelled</span>{% endif %}
+            {% if j.balance>0 %}<span class="badge b-cancel">Owes {{j.balance|money}}</span>{% endif %}
+          </div>
+        </a>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="empty">No jobs yet.</div>
+  {% endif %}
+  <a class="btn full" style="margin-top:8px" href="{{url_for('job_new')}}?cid={{customer.id}}">+ New Job</a>
+{% endblock %}

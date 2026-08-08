@@ -10,6 +10,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: CRM_PASSWORD
-        sync: false      # set a password in the Render dashboard (leave blank for open)
-      - key: CRM_DB_PATH
-        sync: false      # e.g. /var/data/crm.db  (must live on a persistent disk)
+        sync: false      # set a password in the Render dashboard (blank = auto-generated)
+      - key: DATABASE_URL
+        sync: false      # from a Render Postgres instance (internal connection string)
+    # No persistent disk needed: data lives in managed Postgres (DATABASE_URL).

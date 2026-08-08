@@ -304,14 +304,15 @@ def health():
 if __name__ == "__main__":
     models.init_db()
     resolve_password()
-    # Loud warning: on Render (and most PaaS), the filesystem is ephemeral.
-    # Without a persistent disk + CRM_DB_PATH, the database is wiped on restart.
-    on_paas = bool(os.environ.get("RENDER")) or os.environ.get("PORT") and os.path.exists("/.dockerenv")
-    if on_paas and not os.environ.get("CRM_DB_PATH"):
+    # Data persistence guidance.
+    if models.USE_PG:
+        print("\n  Using Postgres (DATABASE_URL). Data is managed & survives restarts.\n")
+    elif not os.environ.get("CRM_DB_PATH"):
         print("\n" + "!" * 60)
-        print("  WARNING: no CRM_DB_PATH set on a PaaS host.")
-        print("  Your data will be LOST on every restart/deploy.")
-        print("  Attach a persistent disk and set CRM_DB_PATH=/var/data/crm.db")
+        print("  WARNING: using local SQLite with no CRM_DB_PATH set.")
+        print("  On a PaaS host the filesystem is ephemeral and your data")
+        print("  will be LOST on every restart. Either set CRM_DB_PATH to a")
+        print("  persistent disk, or set DATABASE_URL to a Postgres DB.")
         print("!" * 60 + "\n")
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)

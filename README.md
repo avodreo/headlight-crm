@@ -33,20 +33,22 @@ python -c "import models, models as m; m.init_db(); m.seed_demo()"
    - Build command: `pip install -r requirements.txt`
    - Start command: `waitress-serve --port=$PORT app:app`
    - (Or just import `render.yaml` — it sets exactly this.)
-3. **Persistent disk** (REQUIRED — SQLite lives on disk):
-   - Add a Disk: Mount Path `/var/data`, size 1 GB.
-   - Set env var `CRM_DB_PATH=/var/data/crm.db`.
-   - Without this, the free tier wipes the filesystem on each restart and you
-     lose all customers/jobs. The app also prints a startup WARNING if it
-     detects a PaaS host without `CRM_DB_PATH` set.
+3. **Add a managed Postgres database** (the recommended, zero-friction option):
+   - *New > PostgreSQL* → create it, then on your **Web Service** add
+     an environment variable `DATABASE_URL` and set it to the Postgres
+     instance's **internal** connection string (`postgres://...:5432/...`),
+     not the external one.
+   - The app uses Postgres automatically when `DATABASE_URL` is set, and the
+     data **survives restarts with no disk required**.
 4. **Set a password** (the app is never world-open):
    - Set `CRM_PASSWORD` to your own passphrase. If you leave it blank, the app
      auto-generates a strong one, prints it to the logs, and persists it in the
      DB (so it survives restarts). Set `CRM_PASSWORD` to control it yourself.
 5. Open the generated `https://<your-service>.onrender.com` on your phone.
 
-> Prefer a fully managed DB instead of a disk? Swap `models.py`'s sqlite3 calls
-> for Postgres — the rest of the app is DB-agnostic.
+> **Alternative (no DB service):** keep SQLite by attaching a 1 GB persistent
+> disk at `/var/data` and setting `CRM_DB_PATH=/var/data/crm.db`. Postgres is
+> preferred because it's managed and needs no disk.
 
 ## Security model
 - The whole app is gated behind a single password. There is **no "open" mode in
@@ -60,15 +62,16 @@ python -c "import models, models as m; m.init_db(); m.seed_demo()"
 |-----|---------|---------|
 | `SECRET_KEY` | Flask session signing | random per-boot (set for stable sessions) |
 | `CRM_PASSWORD` | App password. If blank, a strong one is auto-generated + logged | (none = auto-gen) |
-| `CRM_DB_PATH` | SQLite file location. **Set to a persistent disk on PaaS** | `data/crm.db` |
+| `DATABASE_URL` | Postgres connection string. **If set, Postgres is used** (managed, survives restarts) | (none → SQLite) |
+| `CRM_DB_PATH` | SQLite file location (only used when `DATABASE_URL` is unset) | `data/crm.db` |
 | `PORT` | Listen port (hosts set this) | 5000 |
 | `SECURE_COOKIES` | Set `0` only if serving over plain HTTP behind no TLS | `1` |
 
 ## Project layout
 ```
 app.py            Flask routes + auth (single-password, brute-force protected)
-models.py         SQLite data layer (customers, jobs, payments, settings)
+models.py         Data layer — Postgres (DATABASE_URL) or SQLite fallback
 templates/        Mobile-responsive HTML pages
-data/crm.db       SQLite database (created automatically)
-requirements.txt  Flask + waitress
+data/crm.db       SQLite database (only when DATABASE_URL is unset)
+requirements.txt  Flask + waitress + psycopg
 ```

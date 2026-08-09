@@ -3,6 +3,9 @@ Headlight Restoration CRM — Flask application.
 Server-rendered, mobile-responsive. Single-password auth (never open in prod).
 """
 import os
+import io
+import csv
+import zipfile
 import secrets
 import time
 from datetime import datetime, date
@@ -350,6 +353,145 @@ def delete_photo(pid):
     models.photo_delete(pid)
     flash("Photo deleted.", "success")
     return redirect(url_for("job_detail", jid=jid))
+
+
+# --------------------------- Backup / Restore ---------------------------
+
+def _csv_bytes(rows, columns):
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
+    w.writeheader()
+    for r in rows:
+        w.writerow({c: r.get(c, "") for c in columns})
+    return buf.getvalue().encode("utf-8")
+
+
+@app.route("/settings")
+def settings():
+    stats = models.dashboard_stats()
+    return render_template("settings.html", stats=stats, USE_PG=models.USE_PG)
+
+
+@app.route("/backup/export")
+def backup_export():
+    """Download a ZIP: three CSVs (customers, jobs, payments) + photos/*.
+
+    Photo rows carry their job_id so import can re-link them.
+    """
+    customers = models.customers_all()
+    jobs = models.jobs_all()
+    payments = models.payments_all()
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("customers.csv", _csv_bytes(
+            customers, ["id", "name", "phone", "email", "address", "vehicle", "notes", "created_at"]))
+        z.writestr("jobs.csv", _csv_bytes(
+            jobs, ["id", "customer_id", "job_date", "status", "service_type",
+                   "price", "cost", "notes", "created_at"]))
+        z.writestr("payments.csv", _csv_bytes(
+            payments, ["id", "job_id", "amount", "method", "pay_date", "note", "created_at"]))
+        # photos as files, named by their ORIGINAL db id with job_id in the name
+        conn = models.get_conn()
+        try:
+            cur = conn.execute(models._sql(
+                "SELECT id, job_id, kind, data, mime FROM job_photos"))
+            for pid, job_id, kind, data, mime in cur.fetchall():
+                ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}.get(mime, "jpg")
+                z.writestr(f"photos/photo_{pid}_job{job_id}_{kind}.{ext}", bytes(data))
+        finally:
+            conn.close()
+    mem.seek(0)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M")
+    return Response(
+        mem.getvalue(),
+        mimetype="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="headlight-crm-backup-{stamp}.zip"'},
+    )
+
+
+@app.route("/backup/import", methods=["POST"])
+def backup_import():
+    f = request.files.get("backup")
+    if not f or not f.filename:
+        flash("No backup file selected.", "error")
+        return redirect(url_for("settings"))
+    if not f.filename.lower().endswith(".zip"):
+        flash("Backup must be a .zip exported from this app.", "error")
+        return redirect(url_for("settings"))
+    try:
+        z = zipfile.ZipFile(io.BytesIO(f.read()))
+    except zipfile.BadZipFile:
+        flash("That file is not a valid backup ZIP.", "error")
+        return redirect(url_for("settings"))
+
+    def read_csv(name):
+        try:
+            with z.open(name) as fh:
+                return list(csv.DictReader(io.TextIOWrapper(fh, encoding="utf-8")))
+        except KeyError:
+            return []
+
+    customers = read_csv("customers.csv")
+    jobs = read_csv("jobs.csv")
+    payments = read_csv("payments.csv")
+
+    models.wipe_all()
+
+    # remap old ids -> new ids
+    cid_map, jid_map = {}, {}
+    for c in customers:
+        new = models.customer_create(
+            name=c.get("name", "").strip() or "Unknown",
+            phone=c.get("phone", ""), email=c.get("email", ""),
+            address=c.get("address", ""), vehicle=c.get("vehicle", ""),
+            notes=c.get("notes", ""))
+        cid_map[c.get("id")] = new
+    for j in jobs:
+        old_cid = j.get("customer_id")
+        new_cid = cid_map.get(old_cid, old_cid)
+        new = models.job_create(
+            customer_id=int(new_cid) if str(new_cid).isdigit() else 0,
+            job_date=j.get("job_date") or None,
+            status=j.get("status", "Scheduled"),
+            service_type=j.get("service_type", ""),
+            price=float(j.get("price") or 0),
+            cost=float(j.get("cost") or 0),
+            notes=j.get("notes", ""))
+        jid_map[j.get("id")] = new
+    for p in payments:
+        old_jid = p.get("job_id")
+        new_jid = jid_map.get(old_jid, old_jid)
+        if not str(new_jid).isdigit():
+            continue
+        models.payment_create(
+            int(new_jid), float(p.get("amount") or 0),
+            p.get("method", ""), p.get("pay_date") or None, p.get("note", ""))
+    # restore photos
+    for name in z.namelist():
+        if not name.startswith("photos/") or not name.endswith((".jpg", ".png", ".webp")):
+            continue
+        # photo_<pid>_job<job_id>_<kind>.ext
+        base = name.split("/")[-1]
+        parts = base.split("_")
+        job_part = next((p for p in parts if p.startswith("job")), None)
+        kind_part = base.rsplit("_", 1)[-1].split(".")[0]
+        if not job_part:
+            continue
+        old_jid = job_part[3:]
+        new_jid = jid_map.get(old_jid, old_jid)
+        if not str(new_jid).isdigit():
+            continue
+        mime = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(
+            base.rsplit(".", 1)[-1], "image/jpeg")
+        with z.open(name) as fh:
+            data = fh.read()
+        try:
+            models.photo_upload(int(new_jid), kind_part, data, mime)
+        except ValueError:
+            pass
+
+    flash("Backup restored successfully.", "success")
+    return redirect(url_for("dashboard"))
 
 
 # ------------------------------ API ------------------------------

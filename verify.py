@@ -113,6 +113,48 @@ r = client.post(f"/customers/{cid}/delete")
 check("POST delete customer", r, 302)
 assert models.customer_get(cid) is None
 
+# --- Backup export / import round-trip ---
+import io as _io, zipfile as _zip
+# seed some data to back up
+_cid = models.customer_create("Backup Test", "555", "", "", "Car", "")
+_jid = models.job_create(_cid, "2026-10-01", "Completed", "Std", 100, 10, "")
+models.payment_create(_jid, 50, "Cash", "2026-10-01", "")
+_png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC")
+_pid = models.photo_upload(_jid, "before", _png, "image/png")
+
+# export
+r = client.get("/backup/export")
+check("GET /backup/export", r, 200)
+assert r.content_type == "application/zip", r.content_type
+zbytes = r.data  # fresh bytes for import
+with _zip.ZipFile(_io.BytesIO(zbytes)) as z:
+    names = z.namelist()
+assert "customers.csv" in names and "jobs.csv" in names and "payments.csv" in names, names
+assert any(n.startswith("photos/") for n in names), names
+
+# wipe then import the same zip back
+models.wipe_all()
+assert models.customers_all() == []
+# import via POST (multipart) reading fresh bytes
+r = client.post("/backup/import", data={
+    "backup": (_io.BytesIO(zbytes), "backup.zip", "application/zip")},
+    content_type="multipart/form-data")
+check("POST /backup/import", r, 302)
+restored = models.customers_all()
+assert any(c["name"] == "Backup Test" for c in restored), restored
+assert len(models.photos_for_job(_jid)) == 0  # old jid gone after wipe; new one created
+# verify the photo was re-linked to a (new) job: total photos == 1
+_conn = models.get_conn()
+try:
+    _n = _conn.execute("SELECT COUNT(*) FROM job_photos").fetchone()[0]
+finally:
+    _conn.close()
+assert _n == 1, _n
+print("[OK] backup export/import round-trip restored data + photo")
+
+# cleanup the round-trip rows so we leave a clean DB
+models.wipe_all()
+
 # --- Stats correctness on leftover demo data ---
 s = models.dashboard_stats()
 assert "revenue" in s and "profit" in s and "outstanding" in s

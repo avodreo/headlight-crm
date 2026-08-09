@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Settings · Headlight CRM{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+
+<div class="card">
+  <h2>Backup &amp; Restore</h2>
+  <p class="muted">On free hosting the database can be wiped on restart. Export a backup
+    regularly and re-import it after any restart to keep your data.</p>
+  <div class="row" style="align-items:stretch">
+    <a class="btn ghost" href="{{ url_for('backup_export') }}">⬇ Export backup (.zip)</a>
+    <form method="post" action="{{ url_for('backup_import') }}"
+          enctype="multipart/form-data" style="flex:1;display:flex;gap:8px">
+      <input type="file" name="backup" accept=".zip" required>
+      <button class="btn red" type="submit">⬆ Restore</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Current data</h2>
+  <div class="kv"><span class="k">Customers</span><span>{{ stats.customers }}</span></div>
+  <div class="kv"><span class="k">Jobs</span><span>{{ stats.jobs }}</span></div>
+  <div class="kv"><span class="k">Revenue</span><span>{{ stats.revenue|money }}</span></div>
+  <div class="kv"><span class="k">Profit</span><span>{{ stats.profit|money }}</span></div>
+</div>
+
+<div class="card">
+  <h2>Storage</h2>
+  <p class="muted">{% if USE_PG %}Using managed Postgres — data persists across restarts.{% else %}
+    Using local SQLite. On Render's free tier this is <b>ephemeral</b>: a restart loses data.
+    Export backups and set <code>DATABASE_URL</code> to a Postgres instance to make it permanent.{% endif %}</p>
+</div>
+{% endblock %}

@@ -328,6 +328,29 @@ def payments_for_job(jid):
     return rows
 
 
+def payments_all():
+    conn = get_conn()
+    cur = conn.execute(
+        "SELECT * FROM payments ORDER BY COALESCE(pay_date,'9999-12-31') DESC, id DESC"
+    )
+    rows = _rows(cur)
+    conn.close()
+    return rows
+
+
+def wipe_all():
+    """Delete every row (photos -> payments -> jobs -> customers).
+
+    Used by backup restore. The admin password lives in `meta` and is left
+    untouched so the running session keeps working.
+    """
+    conn = get_conn()
+    for t in ("job_photos", "payments", "jobs", "customers"):
+        conn.execute(_sql(f"DELETE FROM {t}"))
+    conn.commit()
+    conn.close()
+
+
 # ----------------------------- Photos ------------------------------
 
 _ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp"}

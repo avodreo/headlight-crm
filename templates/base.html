@@ -100,6 +100,7 @@
     <a href="{{ url_for('dashboard') }}" class="{{'active' if request.endpoint=='dashboard'}}">📊 Dashboard</a>
     <a href="{{ url_for('jobs') }}" class="{{'active' if 'job' in request.endpoint}}">🛠 Jobs</a>
     <a href="{{ url_for('customers') }}" class="{{'active' if 'customer' in request.endpoint}}">👥 Customers</a>
+    <a href="{{ url_for('settings') }}" class="{{'active' if request.endpoint=='settings'}}">⚙ Settings</a>
   </nav>
   <main>
     {% with msgs = get_flashed_messages(with_categories=true) %}
